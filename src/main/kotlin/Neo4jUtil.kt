@@ -5,18 +5,62 @@ import java.util.*
 import java.util.logging.Level
 import java.util.logging.Logger
 
-class DriverIntroductionExample(uri: String?, user: String?, password: String?, config: Config?) : AutoCloseable {
+class Neo4jUtil() : AutoCloseable {
     private val driver: Driver
+
+    private val mySession
+        get() = driver.session(SessionConfig.forDatabase("neo4j"))
+
 
     init {
         // The driver is a long living object and should be opened during the start of your application
-        driver = GraphDatabase.driver(uri, AuthTokens.basic(user, password), config)
+        val env = Dotenv.load()
+        val neo4jUri = env["NEO4J_URI"]
+        val neo4jUserName = env["NEO4J_USERNAME"]
+        val neo4jUserPw = env["NEO4J_PASSWORD"]
+
+        driver = GraphDatabase.driver(
+            neo4jUri,
+            AuthTokens.basic(
+                neo4jUserName,
+                neo4jUserPw
+            ),
+            Config.defaultConfig()
+        )
     }
 
     @Throws(Exception::class)
     override fun close() {
         // The driver object should be closed before the application ends.
         driver.close()
+    }
+
+    fun runBetweennessCentrality() {
+        // check if graph exists
+        val graphName = "myUndirectedGraph"
+        val qRemoveGraphIfExists = "Call gds.graph.drop('$graphName', false);"
+        val qCreateGraph = "Call gds.graph.project('$graphName', ['Apartment', 'PublicTransport', 'EducationalFacility', 'ConvenienceFacility'], {NEAR: { orientation: 'UNDIRECTED'}});"
+        val qCalculation = """
+            CALL gds.betweenness.stream('myUndirectedGraph')
+            YIELD nodeId, score
+            RETURN gds.util.asNode(nodeId).name AS name, score
+            ORDER BY score DESC
+        """.trimIndent()
+
+        try {
+            mySession.use {
+                it.run(qRemoveGraphIfExists)
+                it.run(qCreateGraph)
+                val result = it.run(qCalculation)
+                for (record in result.list().take(5)) {
+                    println("record name=${record.get("name")}, score=${record["score"]}")
+                }
+
+            }
+
+        } catch (e: Neo4jException) {
+            e.printStackTrace()
+        }
     }
 
     fun createFriendship(person1Name: String, person2Name: String) {
@@ -32,7 +76,7 @@ class DriverIntroductionExample(uri: String?, user: String?, password: String?, 
         params["person1_name"] = person1Name
         params["person2_name"] = person2Name
         try {
-            driver.session(SessionConfig.forDatabase("neo4j")).use { session ->
+            mySession.use { session ->
                 // Write transactions allow the driver to handle retries and transient errors
                 val record = session.writeTransaction { tx: Transaction ->
                     val result = tx.run(createFriendshipQuery, params)
@@ -61,7 +105,7 @@ class DriverIntroductionExample(uri: String?, user: String?, password: String?, 
         println(readPersonByNameQuery)
         val params = Collections.singletonMap<String, Any>("apart_name", apartmentName)
         try {
-            driver.session(SessionConfig.forDatabase("neo4j")).use { session ->
+            mySession.use { session ->
                 val record = session.readTransaction { tx: Transaction ->
                     val result = tx.run(readPersonByNameQuery, params)
                     result.single()
@@ -75,21 +119,6 @@ class DriverIntroductionExample(uri: String?, user: String?, password: String?, 
     }
 
     companion object {
-        private val LOGGER = Logger.getLogger(DriverIntroductionExample::class.java.name)
-        @Throws(Exception::class)
-        @JvmStatic
-        fun main(args: Array<String>) {
-
-            val env = Dotenv.load()
-            val NEO4J_URI = env["NEO4J_URI"]
-            val NEO4J_USERNAME = env["NEO4J_USERNAME"]
-            val NEO4J_PASSWORD = env["NEO4J_PASSWORD"]
-            val AURA_INSTANCENAME = env["AURA_INSTANCENAME"]
-
-            DriverIntroductionExample(NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD, Config.defaultConfig()).use { app ->
-//                app.createFriendship("Alice", "David")
-                app.findApartment("반포자이")
-            }
-        }
+        private val LOGGER = Logger.getLogger(Neo4jUtil::class.java.name)
     }
 }

@@ -24,7 +24,8 @@ dependencies {
     implementation "org.geotools:gt-tile-client:${geotools_version}"
     implementation "org.apache.commons:commons-csv:1.9.0"
     implementation 'io.github.cdimascio:dotenv-kotlin:6.3.1'
-    implementation 'org.neo4j.driver:neo4j-java-driver:4.1.0'
+    implementation 'org.neo4j.driver:neo4j-java-driver:5.0.0'
+    implementation 'org.slf4j:slf4j-api:2.0.3'
 }
 
 test {
