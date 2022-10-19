@@ -37,7 +37,7 @@ class Neo4jUtil() : AutoCloseable {
         driver.close()
     }
 
-    fun runBetweennessCentrality() {
+    fun runBetweennessCentrality(): List<MyResult> {
         // check if graph exists
         val graphName = "myUndirectedGraph"
         val qRemoveGraphIfExists = "Call gds.graph.drop('$graphName', false);"
@@ -45,22 +45,44 @@ class Neo4jUtil() : AutoCloseable {
         val qCalculation = """
             CALL gds.betweenness.stream('myUndirectedGraph')
             YIELD nodeId, score
-            RETURN gds.util.asNode(nodeId).name AS name, score
+            RETURN 
+                gds.util.asNode(nodeId) AS node,
+                score
             ORDER BY score DESC
         """.trimIndent()
 
-        try {
+        return try {
             mySession.use {
                 it.run(qRemoveGraphIfExists)
                 it.run(qCreateGraph)
                 val result = it.run(qCalculation)
-                for (record in result.list().take(5)) {
-                    println("record name=${record.get("name")}, score=${record["score"]}")
-                }
-            }
+                val myResultList = result.list().map { record ->
+                    val node = record["node"].asNode()
 
+                    MyResult(
+                        node = node,
+                        id = node.elementId(),
+                        type = when {
+                            node.labels().first() == "Apartment" -> "Apartment"
+                            else -> node["type"].asString()
+                        },
+                        name = node["name"].asString(),
+                        point = node["coord"].asPoint(),
+                        score = record["score"].asDouble()
+                    )
+                }
+
+                myResultList
+                    .sortedByDescending { item -> item.score }
+                    .take(4)
+                    .forEach {
+                        println("name=${it.name}, score=${it.score}")
+                    }
+                myResultList
+            }
         } catch (e: Neo4jException) {
             e.printStackTrace()
+            throw e
         }
     }
 

@@ -1,12 +1,18 @@
+import utils.GeoToolsUtil.convertCsvToShp
+import utils.GeoToolsUtil.createShapeFileWithResults
 import utils.GeoToolsUtil.showMapWithCsvFile
+import utils.Neo4jUtil
 
 fun main(args: Array<String>) {
-//    Neo4jUtil().use { app ->
-//        app.runBetweennessCentrality()
-//    }
+    val resultList = Neo4jUtil().use { app ->
+        app.runBetweennessCentrality()
+    }
+    createShapeFileWithResults(resultList)
+
 
 //    convertCsvToShp()
 //    loadShapeFileAndDisplay()
-    showMapWithCsvFile()
+//    showMapWithCsvFile()
+//    convertCsvToShp()
 }
 
