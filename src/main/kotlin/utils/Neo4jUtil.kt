@@ -1,3 +1,5 @@
+package utils
+
 import io.github.cdimascio.dotenv.Dotenv
 import org.neo4j.driver.*
 import org.neo4j.driver.exceptions.Neo4jException
@@ -55,7 +57,6 @@ class Neo4jUtil() : AutoCloseable {
                 for (record in result.list().take(5)) {
                     println("record name=${record.get("name")}, score=${record["score"]}")
                 }
-
             }
 
         } catch (e: Neo4jException) {

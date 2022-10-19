@@ -1,3 +1,5 @@
+package utils
+
 import org.apache.commons.csv.CSVFormat
 import org.apache.commons.csv.CSVParser
 import org.apache.commons.csv.CSVRecord
@@ -19,20 +21,15 @@ import org.geotools.map.FeatureLayer
 import org.geotools.map.Layer
 import org.geotools.map.MapContent
 import org.geotools.styling.SLD
-import org.geotools.styling.Style
 import org.geotools.styling.StyleBuilder
 import org.geotools.swing.JMapFrame
 import org.geotools.swing.data.JFileDataStoreChooser
-import org.geotools.tile.TileService
-import org.geotools.tile.impl.osm.OSMService
-import org.geotools.tile.util.TileLayer
 import org.geotools.util.logging.Logging
 import org.locationtech.jts.geom.Coordinate
 import org.locationtech.jts.geom.Point
 import org.opengis.feature.simple.SimpleFeature
 import org.opengis.feature.simple.SimpleFeatureType
 import java.awt.Color
-import java.awt.Font
 import java.io.BufferedReader
 import java.io.File
 import java.io.FileReader
@@ -43,9 +40,9 @@ import kotlin.String
 import kotlin.system.exitProcess
 
 
-object Quickstart {
+object GeoToolsUtil {
 
-    private val LOGGER = Logging.getLogger(Quickstart::class.java)
+    private val LOGGER = Logging.getLogger(GeoToolsUtil::class.java)
 
     fun convertCsvToShp() {
 
@@ -182,7 +179,8 @@ object Quickstart {
             exitProcess(1);
         }
     }
-    fun loadShapeFileAndDisplay(inputFile: File? = null) {
+
+    fun showMapWithShapeFile(inputFile: File? = null) {
         // display a data store file chooser dialog for shapefiles
         val file = inputFile ?: JFileDataStoreChooser.showOpenFile("shp", null) ?: return
 
@@ -253,7 +251,7 @@ object Quickstart {
         return newFile
     }
 
-    fun test() {
+    fun showMapWithCsvFile() {
 
         val file = File("apt_info - apt_info.csv")
 
@@ -287,20 +285,15 @@ object Quickstart {
 
             //배경지도는 브이월드 타일 레이어로 추가했다.
 //            val baseURL = "http://xdworld.vworld.kr:8080/2d/Base/201802/"
-//            val service: TileService = OSMService("vworld", baseURL)
-//            val tile_layer = TileLayer(service)
-//            mapContent.addLayer(tile_layer)
+//            val baseURL = "https://tile.openstreetmap.org/"
+
+//            mapContent.addLayer(TileLayer(OSMService("OSM", baseURL)))
 
             val pointCollection = DefaultFeatureCollection()
             val pointFeatureBuilder = SimpleFeatureBuilder(pointTb.buildFeatureType())
             val layerPoints: Layer
-            val coords: ArrayList<Coordinate> = ArrayList()
 
             for (record in records) {
-                println("record = ${record[2]}")
-
-//                println("record = ${records[i].size()}")
-
                 val lon = record[indexOfLongitude].toDoubleOrNull() //경도 컬럼
                 val lat = record[indexOfLatitude].toDoubleOrNull() //위도 컬럼
                 val label = record[indexOfName] ?: "LABEL"
@@ -312,7 +305,6 @@ object Quickstart {
                     println("latitude is null!! on $record")
                 } else {
                     val point = geometryFactory.createPoint(Coordinate(lon, lat))
-                    coords.add(Coordinate(lon, lat))
                     pointFeatureBuilder.add(point)
                     pointFeatureBuilder["LABEL"] = label
 //                    pointFeatureBuilder["ID"] = id
