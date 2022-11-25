@@ -16,10 +16,14 @@ class Neo4jUtil() : AutoCloseable {
 
     init {
         // The driver is a long living object and should be opened during the start of your application
-        val env = Dotenv.load()
-        val neo4jUri = env["NEO4J_URI"]
-        val neo4jUserName = env["NEO4J_USERNAME"]
-        val neo4jUserPw = env["NEO4J_PASSWORD"]
+//        val env = Dotenv.load()
+//        val neo4jUri = env["NEO4J_URI"]
+//        val neo4jUserName = env["NEO4J_USERNAME"]
+//        val neo4jUserPw = env["NEO4J_PASSWORD"]
+
+        val neo4jUri = "neo4j://localhost:7687"
+        val neo4jUserName = "neo4j"
+        val neo4jUserPw = "pw"
 
         driver = GraphDatabase.driver(
             neo4jUri,
