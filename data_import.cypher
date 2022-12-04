@@ -1,5 +1,7 @@
-// 0) 아파트, 지역 노드 생성
+// 이전 노드들 모두 삭제
+MATCH (n) DETACH DELETE n;
 
+// 0) 아파트, 지역 노드 생성
 // 제약조건 설정
 CREATE CONSTRAINT IF NOT EXISTS FOR (apt: Apartment) REQUIRE apt.apt_id IS UNIQUE;
 CREATE CONSTRAINT IF NOT EXISTS FOR (region_code: Region) REQUIRE region_code.region_code IS UNIQUE;
@@ -8,8 +10,8 @@ CREATE CONSTRAINT IF NOT EXISTS FOR (region_code: Region) REQUIRE region_code.re
 LOAD CSV WITH HEADERS FROM 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTc_mAKF78DEloooXtrpRent-OzssLxuOvzRlOaYP47Ckf7gdZleo-ovqfWM3F4AYvpxclJ11Qg_g2u/pub?gid=349222695&single=true&output=csv' AS nodeRecord
 // Apartment 노드 생성
 MERGE (n: Apartment { apt_id: toInteger(nodeRecord.apt_id) })
+SET n.name = nodeRecord.n_apt_title
 SET n.dong_name = nodeRecord.apt_title // apt_title 은 잘못 들어간 컬럼. 동이름임
-SET n.apt_title = nodeRecord.n_apt_title // n_apt_title 이 진짜 아파트 이름
 SET n.coord = point({latitude: toFloat(nodeRecord.lat), longitude: toFloat(nodeRecord.lon)});
 
 
@@ -26,7 +28,7 @@ WITH nodeRecord
 MERGE (n: BusStation { station_id: nodeRecord.station_id })
 SET n: PublicTransport
 SET n.type = "버스정류장"
-SET n.station_name = nodeRecord.station_name
+SET n.name = nodeRecord.station_name
 SET n.coord = point({latitude: toFloat(nodeRecord.lat), longitude: toFloat(nodeRecord.lon)})
 } IN TRANSACTIONS OF 500 ROWS;
 
@@ -48,6 +50,7 @@ LOAD CSV WITH HEADERS FROM 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTOA
 MERGE (n: Subway { no: toInteger(nodeRecord.no) })
 SET n: PublicTransport
 SET n.type = "지하철역"
+SET n.name = nodeRecord.line_name + " " + nodeRecord.station_nm + "역"
 SET n.station_cd = toInteger(nodeRecord.station_cd)
 SET n.station_nm = nodeRecord.station_nm
 SET n.line_num = nodeRecord.line_num
