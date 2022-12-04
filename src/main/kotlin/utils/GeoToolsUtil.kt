@@ -1,5 +1,6 @@
 package utils
 
+import model.MyNode
 import org.apache.commons.csv.CSVFormat
 import org.apache.commons.csv.CSVParser
 import org.apache.commons.csv.CSVRecord
@@ -30,9 +31,7 @@ import org.locationtech.jts.geom.Point
 import org.opengis.feature.simple.SimpleFeature
 import org.opengis.feature.simple.SimpleFeatureType
 import java.awt.Color
-import java.io.BufferedReader
 import java.io.File
-import java.io.FileReader
 import java.io.Serializable
 import java.nio.charset.Charset
 import javax.swing.UIManager
@@ -173,7 +172,7 @@ object GeoToolsUtil {
         }
     }
 
-    fun createShapeFileWithResults(myResultList: List<MyResult>) {
+    fun createShapeFileWithResults(myNodeList: List<MyNode>) {
 
         // Set cross-platform look & feel for compatability
         UIManager.setLookAndFeel(UIManager.getCrossPlatformLookAndFeelClassName())
@@ -203,18 +202,18 @@ object GeoToolsUtil {
         val geometryFactory = JTSFactoryFinder.getGeometryFactory()
         val featureBuilder = SimpleFeatureBuilder(TYPE)
 
-        for (record in myResultList) {
+        for (myNode in myNodeList) {
             featureBuilder.add(
                 geometryFactory.createPoint(
                     Coordinate(
-                        record.point.x(),
-                        record.point.y()
+                        myNode.point.x(),
+                        myNode.point.y()
                     )
                 )
             )
-            featureBuilder.add("[${record.type}] ${record.name}")
-            featureBuilder.add(record.score)
-            val feature = featureBuilder.buildFeature(record.id)
+            featureBuilder.add("[${myNode.type}] ${myNode.name}")
+            featureBuilder.add(myNode.score)
+            val feature = featureBuilder.buildFeature(myNode.id)
             features.add(feature)
         }
 

@@ -1,6 +1,6 @@
 package utils
 
-import io.github.cdimascio.dotenv.Dotenv
+import model.MyNode
 import org.neo4j.driver.*
 import org.neo4j.driver.exceptions.Neo4jException
 import java.util.*
@@ -41,7 +41,48 @@ class Neo4jUtil() : AutoCloseable {
         driver.close()
     }
 
-    fun runBetweennessCentrality(): List<MyResult> {
+    fun saveAllNodesAsCsv() {
+        val qMatchAll = """
+                    MATCH (n) RETURN n
+               """.trimIndent()
+        try {
+            mySession.use { session ->
+                val records = session.run(qMatchAll).list().map { record ->
+                    val node = record["n"].asNode()
+
+                    MyNode(
+                        node = node,
+                        id = node.elementId(),
+                        type = when {
+                            node.labels().first() == "Apartment" -> "Apartment"
+                            else -> node["type"].asString()
+                        },
+                        name = node["name"].asString(),
+                        point = node["coord"].asPoint(),
+                        score = record["score"].asDouble(0.0)
+                    )
+                }
+
+                listOf(
+                    "ConvenienceFacility",
+                    "PublicTransport",
+                    "Apartment",
+                    "EducationalFacility",
+                )
+                    .forEach { label ->
+                        val nodes = records.filter {
+                            it.node.labels().contains(label)
+                        }
+                        CsvUtil.writeCsv(nodes, label)
+                    }
+            }
+        } catch (ex: Neo4jException) {
+            ex.printStackTrace()
+            throw ex
+        }
+    }
+
+    fun runBetweennessCentrality(): List<MyNode> {
         // check if graph exists
         val graphName = "myUndirectedGraph"
         val qRemoveGraphIfExists = "Call gds.graph.drop('$graphName', false);"
@@ -60,10 +101,10 @@ class Neo4jUtil() : AutoCloseable {
                 it.run(qRemoveGraphIfExists)
                 it.run(qCreateGraph)
                 val result = it.run(qCalculation)
-                val myResultList = result.list().map { record ->
+                val myNodeList = result.list().map { record ->
                     val node = record["node"].asNode()
 
-                    MyResult(
+                    MyNode(
                         node = node,
                         id = node.elementId(),
                         type = when {
@@ -76,13 +117,13 @@ class Neo4jUtil() : AutoCloseable {
                     )
                 }
 
-                myResultList
+                myNodeList
                     .sortedByDescending { item -> item.score }
                     .take(4)
                     .forEach {
                         println("name=${it.name}, score=${it.score}")
                     }
-                myResultList
+                myNodeList
             }
         } catch (e: Neo4jException) {
             e.printStackTrace()
