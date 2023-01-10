@@ -54,7 +54,7 @@ class Neo4jUtil() : AutoCloseable {
                         node = node,
                         id = node.elementId(),
                         type = when {
-                            node.labels().first() == "Apartment" -> "Apartment"
+                            node.labels().first() == "Apartment" -> "아파트"
                             else -> node["type"].asString()
                         },
                         name = node["name"].asString(),

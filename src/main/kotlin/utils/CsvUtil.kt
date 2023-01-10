@@ -11,7 +11,7 @@ object CsvUtil {
         try {
             val fileName = fileName ?: "result_${System.currentTimeMillis()}"
             println("fileName = $fileName")
-            val file = File("/Users/hwaminson/dev/shp/boo-talk/$fileName.csv")
+            val file = File("./data/shp/$fileName.csv")
 
             CSVFormat.DEFAULT.print(file, Charset.defaultCharset()).apply {
                 printRecord(
