@@ -6,7 +6,7 @@ import utils.Neo4jUtil
 
 fun main(args: Array<String>) {
     val nodeList = Neo4jUtil().use { app ->
-        app.saveAllNodesAsCsv()
+        app.runBetweennessCentrality()
     }
 //    createShapeFileWithResults(resultList)
 //    nodeList.forEach {

@@ -84,9 +84,17 @@ class Neo4jUtil() : AutoCloseable {
 
     fun runBetweennessCentrality(): List<MyNode> {
         // check if graph exists
-        val graphName = "myUndirectedGraph"
+        val graphName = "graph_nd"
         val qRemoveGraphIfExists = "Call gds.graph.drop('$graphName', false);"
-        val qCreateGraph = "Call gds.graph.project('$graphName', ['Apartment', 'PublicTransport', 'EducationalFacility', 'ConvenienceFacility'], {NEAR: { orientation: 'UNDIRECTED'}});"
+        val qCreateGraph = """
+                Call gds.graph.project(
+                    '$graphName',
+                    ['Apartment', 'PublicTransport', 'EducationalFacility', 'ConvenienceFacility'], 
+                    {
+                        NETWORK_DISTANCE: { orientation: 'UNDIRECTED' }
+                    }
+                );
+            """.trimIndent()
         val qCalculation = """
             CALL gds.betweenness.stream('myUndirectedGraph')
             YIELD nodeId, score
