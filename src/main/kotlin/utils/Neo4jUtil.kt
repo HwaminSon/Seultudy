@@ -60,7 +60,7 @@ class Neo4jUtil() : AutoCloseable {
                         node = node,
                         id = node.elementId(),
                         type = when {
-                            node.labels().first() == "Apartment" -> "Apartment"
+                            node.labels().first() == "Apartment" -> "아파트"
                             else -> node["type"].asString()
                         },
                         name = node["name"].asString(),
@@ -117,7 +117,7 @@ class Neo4jUtil() : AutoCloseable {
 
     fun runCentrality(centrality: Centrality): List<MyNode> {
         // check if graph exists
-        val graphName = "myUndirectedGraph"
+        val graphName = "graph_nd"
         val qRemoveGraphIfExists = "Call gds.graph.drop('$graphName', false);"
         val qCreateGraph = """
             Call gds.graph.project(

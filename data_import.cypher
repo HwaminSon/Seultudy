@@ -10,8 +10,7 @@ CREATE CONSTRAINT IF NOT EXISTS FOR (region_code: Region) REQUIRE region_code.re
 LOAD CSV WITH HEADERS FROM 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTc_mAKF78DEloooXtrpRent-OzssLxuOvzRlOaYP47Ckf7gdZleo-ovqfWM3F4AYvpxclJ11Qg_g2u/pub?gid=349222695&single=true&output=csv' AS nodeRecord
 // Apartment 노드 생성
 MERGE (n: Apartment { apt_id: toInteger(nodeRecord.apt_id) })
-SET n.name = nodeRecord.n_apt_title
-SET n.dong_name = nodeRecord.apt_title // apt_title 은 잘못 들어간 컬럼. 동이름임
+SET n.name = nodeRecord.apt_title + ' ' + nodeRecord.n_apt_title
 SET n.coord = point({latitude: toFloat(nodeRecord.lat), longitude: toFloat(nodeRecord.lon)});
 
 
