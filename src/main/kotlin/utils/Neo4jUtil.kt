@@ -1,6 +1,7 @@
 package utils
 
 import model.MyNode
+import model.MyRelationship
 import org.neo4j.driver.*
 import org.neo4j.driver.exceptions.Neo4jException
 import java.util.*
@@ -9,6 +10,11 @@ import java.util.logging.Logger
 
 class Neo4jUtil() : AutoCloseable {
     private val driver: Driver
+
+    enum class Centrality {
+        betweenness,
+        eigenvector,
+    }
 
     private val mySession
         get() = driver.session(SessionConfig.forDatabase("neo4j"))
@@ -23,7 +29,7 @@ class Neo4jUtil() : AutoCloseable {
 
         val neo4jUri = "neo4j://localhost:7687"
         val neo4jUserName = "neo4j"
-        val neo4jUserPw = "pw"
+        val neo4jUserPw = "qwer1234"
 
         driver = GraphDatabase.driver(
             neo4jUri,
@@ -73,7 +79,7 @@ class Neo4jUtil() : AutoCloseable {
                         val nodes = records.filter {
                             it.node.labels().contains(label)
                         }
-                        CsvUtil.writeCsv(nodes, label)
+                        CsvUtil.writeNodeToCsv(nodes, label)
                     }
             }
         } catch (ex: Neo4jException) {
@@ -82,13 +88,49 @@ class Neo4jUtil() : AutoCloseable {
         }
     }
 
-    fun runBetweennessCentrality(): List<MyNode> {
+    fun saveAllRelationshipsAsCsv() {
+        try {
+            mySession.use { session ->
+                val records = session.run(
+                    "MATCH ()-[r]->() RETURN r"
+                )
+                    .list()
+                    .map { record ->
+                        val relationship = record["r"].asRelationship()
+
+                        MyRelationship(
+                            relationship = relationship,
+                            id = relationship.elementId(),
+                            start = relationship.startNodeElementId(),
+                            end = relationship.endNodeElementId(),
+                            distance = relationship["total_cost"].asDouble(0.0),
+                        )
+                    }
+
+                CsvUtil.writeRelationshipToCsv(records)
+            }
+        } catch (ex: Neo4jException) {
+            ex.printStackTrace()
+            throw ex
+        }
+    }
+
+    fun runCentrality(centrality: Centrality): List<MyNode> {
         // check if graph exists
         val graphName = "myUndirectedGraph"
         val qRemoveGraphIfExists = "Call gds.graph.drop('$graphName', false);"
-        val qCreateGraph = "Call gds.graph.project('$graphName', ['Apartment', 'PublicTransport', 'EducationalFacility', 'ConvenienceFacility'], {NEAR: { orientation: 'UNDIRECTED'}});"
+        val qCreateGraph = """
+            Call gds.graph.project(
+                '$graphName',
+                 ['Apartment', 'PublicTransport', 'EducationalFacility', 'ConvenienceFacility'],
+                 {NETWORK_DISTANCE: { orientation: 'UNDIRECTED', properties: 'weight' }}
+             );
+        """.trimIndent()
         val qCalculation = """
-            CALL gds.betweenness.stream('myUndirectedGraph')
+            CALL gds.${centrality.name}.stream('${graphName}', {
+              maxIterations: 20,
+              relationshipWeightProperty: 'weight'
+            })
             YIELD nodeId, score
             RETURN 
                 gds.util.asNode(nodeId) AS node,
@@ -123,6 +165,7 @@ class Neo4jUtil() : AutoCloseable {
                     .forEach {
                         println("name=${it.name}, score=${it.score}")
                     }
+
                 myNodeList
             }
         } catch (e: Neo4jException) {

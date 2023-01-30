@@ -1,6 +1,7 @@
 package utils
 
 import model.MyNode
+import model.MyRelationship
 import org.apache.commons.csv.CSVFormat
 import org.apache.commons.csv.CSVParser
 import org.apache.commons.csv.CSVRecord
@@ -21,12 +22,14 @@ import org.geotools.geometry.jts.JTSFactoryFinder
 import org.geotools.map.FeatureLayer
 import org.geotools.map.Layer
 import org.geotools.map.MapContent
+import org.geotools.referencing.CRS
 import org.geotools.styling.SLD
 import org.geotools.styling.StyleBuilder
 import org.geotools.swing.JMapFrame
 import org.geotools.swing.data.JFileDataStoreChooser
 import org.geotools.util.logging.Logging
 import org.locationtech.jts.geom.Coordinate
+import org.locationtech.jts.geom.LineString
 import org.locationtech.jts.geom.Point
 import org.opengis.feature.simple.SimpleFeature
 import org.opengis.feature.simple.SimpleFeatureType
@@ -34,6 +37,7 @@ import java.awt.Color
 import java.io.File
 import java.io.Serializable
 import java.nio.charset.Charset
+import java.nio.file.Paths
 import javax.swing.UIManager
 import kotlin.String
 import kotlin.system.exitProcess
@@ -273,6 +277,112 @@ object GeoToolsUtil {
         } else {
             println("$typeName does not support read/write access");
             exitProcess(1);
+        }
+    }
+
+    fun createPointShapeFile(nodes: List<MyNode>) {
+        val geometryFactory = JTSFactoryFinder.getGeometryFactory()
+
+//        val featureType = SimpleFeatureTypeBuilder().apply {
+//            name = "Point"
+//            setSRS("EPSG:4326")
+//            add("the_geom", Point::class.java)
+//            add("name", String::class.java)
+//            add("type", String::class.java)
+//            add("score", Double::class.java)
+//
+//        }.buildFeatureType()
+        val featureType = DataUtilities.createType(
+            "Point",
+            "the_geom:Point:srid=4326," // <- the geometry attribute: Point type
+                    + "name:String,"// <- a String attribute
+                    + "type:String,"// <- a String attribute
+                    + "score:Double" // a number attribute
+        );
+
+        val featureCollection = DefaultFeatureCollection()
+
+        val featureBuilder = SimpleFeatureBuilder(featureType)
+
+        featureCollection.addAll(nodes.map { node ->
+            featureBuilder.add(geometryFactory.createPoint(Coordinate(node.point.x(), node.point.y())))
+            featureBuilder.add(node.name)
+            featureBuilder.add(node.type)
+            featureBuilder.add(node.score)
+            featureBuilder.buildFeature(null)
+        })
+
+        val dataStore = ShapefileDataStoreFactory()
+            .createNewDataStore(mapOf(
+                "url" to Paths.get("./output/centrality_result_${System.currentTimeMillis()}.shp").toUri().toURL(),
+                "create spatial index" to true,
+                "charset" to Charset.forName("UTF-8")
+            )) as ShapefileDataStore
+
+        dataStore.createSchema(featureType)
+        dataStore.forceSchemaCRS(CRS.decode("EPSG:4326"))
+
+        val transaction = DefaultTransaction("create")
+        val typeName = dataStore.typeNames[0]
+        val featureSource = dataStore.getFeatureSource(typeName)
+        val featureStore = featureSource as SimpleFeatureStore
+        featureStore.transaction = transaction
+        try {
+            featureStore.addFeatures(featureCollection)
+            transaction.commit()
+        } catch (e: Exception) {
+            transaction.rollback()
+        } finally {
+            transaction.close()
+        }
+    }
+
+    fun createLineShapeFile(relationships: List<MyRelationship>) {
+        val geometryFactory = JTSFactoryFinder.getGeometryFactory()
+
+        val featureType = SimpleFeatureTypeBuilder().apply {
+            name = "Route"
+            add("the_geom", LineString::class.java)
+            add("name", String::class.java)
+        }.buildFeatureType()
+
+        val featureCollection = DefaultFeatureCollection()
+
+        val featureBuilder = SimpleFeatureBuilder(featureType)
+
+        featureBuilder.add(geometryFactory.createLineString(arrayOf(Coordinate(1.0, 1.0), Coordinate(3.0, 3.0))))
+        featureBuilder.add("경로 A")
+
+        featureCollection.add(featureBuilder.buildFeature(null))
+
+        featureBuilder.add(geometryFactory.createLineString(arrayOf(Coordinate(3.0, 3.0), Coordinate(5.0, 1.0))))
+        featureBuilder.add("경로 B")
+
+        featureCollection.add(featureBuilder.buildFeature(null))
+
+
+        val dataStore = ShapefileDataStoreFactory()
+            .createNewDataStore(mapOf(
+                "url" to Paths.get("./output/test_line.shp").toUri().toURL(),
+                "create spatial index" to true,
+                "charset" to Charset.forName("UTF-8")
+            )) as ShapefileDataStore
+
+        dataStore.createSchema(featureType)
+//        dataStore.forceSchemaCRS(CRS.decode("EPSG:4326"))
+
+        val transaction = DefaultTransaction("create")
+        val typeName = dataStore.typeNames[0]
+        val featureSource = dataStore.getFeatureSource(typeName)
+        val featureStore = featureSource as SimpleFeatureStore
+        featureStore.transaction = transaction
+        try {
+            featureStore.addFeatures(featureCollection)
+            transaction.commit()
+        } catch (e: Exception) {
+            transaction.rollback()
+        } finally {
+            transaction.close()
         }
     }
 

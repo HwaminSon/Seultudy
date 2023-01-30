@@ -1,6 +1,6 @@
 plugins {
-    id 'org.jetbrains.kotlin.jvm' version '1.7.10'
     id 'application'
+    id 'org.jetbrains.kotlin.jvm' version '1.8.0'
 }
 
 ext{
@@ -27,6 +27,7 @@ dependencies {
     implementation 'org.neo4j.driver:neo4j-java-driver:5.2.0'
     implementation 'org.slf4j:slf4j-api:2.0.4'
     implementation 'com.github.doyaaaaaken:kotlin-csv-jvm:1.6.0'
+    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8"
 }
 
 test {
@@ -34,11 +35,11 @@ test {
 }
 
 compileKotlin {
-    kotlinOptions.jvmTarget = '1.8'
+    kotlinOptions.jvmTarget = "1.8"
 }
 
 compileTestKotlin {
-    kotlinOptions.jvmTarget = '1.8'
+    kotlinOptions.jvmTarget = "1.8"
 }
 
 application {
