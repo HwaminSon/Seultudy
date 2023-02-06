@@ -5,10 +5,7 @@ import model.MyRelationship
 import org.apache.commons.csv.CSVFormat
 import org.apache.commons.csv.CSVParser
 import org.apache.commons.csv.CSVRecord
-import org.geotools.data.DataUtilities
-import org.geotools.data.DefaultTransaction
-import org.geotools.data.FileDataStoreFinder
-import org.geotools.data.Transaction
+import org.geotools.data.*
 import org.geotools.data.collection.ListFeatureCollection
 import org.geotools.data.shapefile.ShapefileDataStore
 import org.geotools.data.shapefile.ShapefileDataStoreFactory
@@ -30,7 +27,9 @@ import org.geotools.swing.data.JFileDataStoreChooser
 import org.geotools.util.logging.Logging
 import org.locationtech.jts.geom.Coordinate
 import org.locationtech.jts.geom.LineString
+import org.locationtech.jts.geom.MultiLineString
 import org.locationtech.jts.geom.Point
+import org.opengis.feature.Feature
 import org.opengis.feature.simple.SimpleFeature
 import org.opengis.feature.simple.SimpleFeatureType
 import java.awt.Color
@@ -46,6 +45,31 @@ import kotlin.system.exitProcess
 object GeoToolsUtil {
 
     private val LOGGER = Logging.getLogger(GeoToolsUtil::class.java)
+
+    fun readLineShapeFile(filePath: String): List<MultiLineString> {
+        val file = File(filePath)
+
+        try {
+            val dataStore = DataStoreFinder.getDataStore(
+                mapOf(
+                    "url" to file.toURI().toString()
+                )
+            )
+
+            val typeName = dataStore.typeNames[0]
+
+            val lineList = dataStore.getFeatureSource(typeName).features.toArray().map {
+                (it as Feature)
+                    .defaultGeometryProperty
+                    .value
+                as MultiLineString
+            }
+
+            return lineList
+        } catch (e: Throwable) {
+            throw e
+        }
+    }
 
     fun convertCsvToShp(csvFile: File? = null) {
 

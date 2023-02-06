@@ -2,6 +2,7 @@ package utils
 
 import model.MyNode
 import model.MyRelationship
+import org.locationtech.jts.geom.MultiLineString
 import org.neo4j.driver.*
 import org.neo4j.driver.exceptions.Neo4jException
 import java.util.*
@@ -19,6 +20,9 @@ class Neo4jUtil() : AutoCloseable {
     private val mySession
         get() = driver.session(SessionConfig.forDatabase("neo4j"))
 
+    private fun createSession(database: String = "neo4j"): Session {
+        return driver.session(SessionConfig.forDatabase(database))
+    }
 
     init {
         // The driver is a long living object and should be opened during the start of your application
@@ -174,36 +178,43 @@ class Neo4jUtil() : AutoCloseable {
         }
     }
 
-    fun createFriendship(person1Name: String, person2Name: String) {
-        // To learn more about the Cypher syntax, see https://neo4j.com/docs/cypher-manual/current/
-        // The Reference Card is also a good resource for keywords https://neo4j.com/docs/cypher-refcard/current/
-        val createFriendshipQuery = """
-               CREATE (p1:Person { name: ${"$"}person1_name })
-               CREATE (p2:Person { name: ${"$"}person2_name })
-               CREATE (p1)-[:KNOWS]->(p2)
-               RETURN p1, p2
-               """.trimIndent()
-        val params: MutableMap<String, Any> = HashMap()
-        params["person1_name"] = person1Name
-        params["person2_name"] = person2Name
+    fun createRoadNetwork(lineList: List<MultiLineString>) {
+
+        val start = System.currentTimeMillis()
+
         try {
-            mySession.use { session ->
-                // Write transactions allow the driver to handle retries and transient errors
-                val record = session.writeTransaction { tx: Transaction ->
-                    val result = tx.run(createFriendshipQuery, params)
-                    result.single()
+            createSession("road-network").use { session ->
+                session.writeTransaction { tx: Transaction ->
+                    for (multiLineString in lineList) {
+                        val coordinates = multiLineString.coordinates
+                        for (i in 1 until coordinates.size) {
+                            println("Connect ${coordinates[i-1]} - ${coordinates[i]}")
+                            val point1 = coordinates[i-1]
+                            val point2 = coordinates[i]
+                            val createLine = """
+                                MERGE (a: Point {coordinate: POINT({latitude:toFloat(${"$"}lat1), longitude:toFloat(${"$"}lng1)})})
+                                MERGE (b: Point {coordinate: POINT({latitude:toFloat(${"$"}lat2), longitude:toFloat(${"$"}lng2)})})
+                                MERGE (a)-[r:CONNECT]-(b)
+                            """.trimIndent()
+
+                            tx.run(
+                                createLine,
+                                mapOf(
+                                    "lat1" to point1.y,
+                                    "lng1" to point1.x,
+                                    "lat2" to point2.y,
+                                    "lng2" to point2.x,
+                                ))
+                        }
+                    }
                 }
-                println(
-                    String.format(
-                        "Created friendship between: %s, %s",
-                        record["p1"]["name"].asString(),
-                        record["p2"]["name"].asString()
-                    )
-                )
             }
+
+            println("Job done. take ${(System.currentTimeMillis() - start)/1000.0} 초")
+
         } catch (ex: Neo4jException) {
-            LOGGER.log(Level.SEVERE, "$createFriendshipQuery raised an exception", ex)
-            throw ex
+            LOGGER.log(Level.SEVERE, "Neo4j Exception. (${ex.message})", ex)
+//            throw ex
         }
     }
 
