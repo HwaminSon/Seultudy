@@ -178,34 +178,39 @@ class Neo4jUtil() : AutoCloseable {
         }
     }
 
-    fun createRoadNetwork(lineList: List<MultiLineString>) {
+    fun createRoadNetwork(lineList: List<Pair<MultiLineString, Double>>) {
 
         val start = System.currentTimeMillis()
 
         try {
             createSession("road-network").use { session ->
-                session.writeTransaction { tx: Transaction ->
-                    for (multiLineString in lineList) {
+                session.executeWriteWithoutResult { tr ->
+                    // 이전의 데이터는 삭제
+                    tr.run("MATCH (n) DETACH DELETE n").consume()
+
+                    for ((multiLineString, length) in lineList) {
                         val coordinates = multiLineString.coordinates
-                        for (i in 1 until coordinates.size) {
-                            println("Connect ${coordinates[i-1]} - ${coordinates[i]}")
-                            val point1 = coordinates[i-1]
-                            val point2 = coordinates[i]
-                            val createLine = """
+
+                        val point1 = coordinates.first()
+                        val point2 = coordinates.last()
+
+                        val createLine = """
                                 MERGE (a: Point {coordinate: POINT({latitude:toFloat(${"$"}lat1), longitude:toFloat(${"$"}lng1)})})
                                 MERGE (b: Point {coordinate: POINT({latitude:toFloat(${"$"}lat2), longitude:toFloat(${"$"}lng2)})})
-                                MERGE (a)-[r:CONNECT]-(b)
+                                MERGE (a)-[r:CONNECT {length: ${"$"}length}]-(b)
                             """.trimIndent()
 
-                            tx.run(
-                                createLine,
-                                mapOf(
-                                    "lat1" to point1.y,
-                                    "lng1" to point1.x,
-                                    "lat2" to point2.y,
-                                    "lng2" to point2.x,
-                                ))
-                        }
+                        val result = tr.run(
+                            createLine,
+                            mapOf(
+                                "lat1" to point1.y,
+                                "lng1" to point1.x,
+                                "lat2" to point2.y,
+                                "lng2" to point2.x,
+                                "length" to length,
+                            ))
+
+                        result.consume()
                     }
                 }
             }

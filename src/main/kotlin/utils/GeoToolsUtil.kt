@@ -46,7 +46,7 @@ object GeoToolsUtil {
 
     private val LOGGER = Logging.getLogger(GeoToolsUtil::class.java)
 
-    fun readLineShapeFile(filePath: String): List<MultiLineString> {
+    fun readLineShapeFile(filePath: String): List<Pair<MultiLineString, Double>> {
         val file = File(filePath)
 
         try {
@@ -59,10 +59,12 @@ object GeoToolsUtil {
             val typeName = dataStore.typeNames[0]
 
             val lineList = dataStore.getFeatureSource(typeName).features.toArray().map {
-                (it as Feature)
-                    .defaultGeometryProperty
-                    .value
-                as MultiLineString
+                val feature = it as Feature
+
+                Pair(
+                    feature.defaultGeometryProperty.value as MultiLineString,
+                    feature.properties.firstOrNull { p -> p.name.toString() == "length" }?.value as Double
+                )
             }
 
             return lineList
