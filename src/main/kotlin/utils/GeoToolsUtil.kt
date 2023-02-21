@@ -63,9 +63,10 @@ object GeoToolsUtil {
 
                 Pair(
                     feature.defaultGeometryProperty.value as MultiLineString,
-                    feature.properties.firstOrNull { p -> p.name.toString() == "length" }?.value as Double
+                    feature.properties.firstOrNull { p -> p.name.toString() == "length" }?.value as? Double ?: 0.0
                 )
             }
+                .filter { (_, length) -> length > 0 }
 
             return lineList
         } catch (e: Throwable) {
