@@ -37,6 +37,7 @@ import java.io.File
 import java.io.Serializable
 import java.nio.charset.Charset
 import java.nio.file.Paths
+import java.time.LocalDateTime
 import javax.swing.UIManager
 import kotlin.String
 import kotlin.system.exitProcess
@@ -203,111 +204,10 @@ object GeoToolsUtil {
         }
     }
 
-    fun createShapeFileWithResults(myNodeList: List<MyNode>) {
-
-        // Set cross-platform look & feel for compatability
-        UIManager.setLookAndFeel(UIManager.getCrossPlatformLookAndFeelClassName())
-
-        /*
-         * We use the DataUtilities class to create a FeatureType that will describe the data in our
-         * shapefile.
-         *
-         * See also the createFeatureType method below for another, more flexible approach.
-         */
-        val TYPE = DataUtilities.createType(
-            "Location",
-            "the_geom:Point:srid=4326," // <- the geometry attribute: Point type
-                    + "name:String,"// <- a String attribute
-                    + "score:Double" // a number attribute
-        );
-
-        /*
-         * A list to collect features as we create them.
-         */
-        val features: MutableList<SimpleFeature> = ArrayList()
-
-        /*
-         * GeometryFactory will be used to create the geometry attribute of each feature,
-         * using a Point object for the location.
-         */
-        val geometryFactory = JTSFactoryFinder.getGeometryFactory()
-        val featureBuilder = SimpleFeatureBuilder(TYPE)
-
-        for (myNode in myNodeList) {
-            featureBuilder.add(
-                geometryFactory.createPoint(
-                    Coordinate(
-                        myNode.point.x(),
-                        myNode.point.y()
-                    )
-                )
-            )
-            featureBuilder.add("[${myNode.type}] ${myNode.name}")
-            featureBuilder.add(myNode.score)
-            val feature = featureBuilder.buildFeature(myNode.id)
-            features.add(feature)
-        }
-
-        /*
-         * Get an output file name and create the new shapefile
-         */
-        val newFile = getNewShapeFile()
-        val dataStoreFactory = ShapefileDataStoreFactory()
-        val params: MutableMap<String, Serializable?> = HashMap()
-        params["url"] = newFile.toURI().toURL()
-        params["create spatial index"] = true
-        val newDataStore = dataStoreFactory.createNewDataStore(params) as ShapefileDataStore
-
-        /*
-         * TYPE is used as a template to describe the file contents
-         */
-        newDataStore.createSchema(TYPE)
-
-        /*
-        * Write the features to the shapefile
-        */
-        val transaction: Transaction = DefaultTransaction("create");
-        val typeName: String = newDataStore.typeNames[0];
-        val featureSource: SimpleFeatureSource = newDataStore.getFeatureSource(typeName);
-        val SHAPE_TYPE: SimpleFeatureType = featureSource.schema;
-
-        /*
-         * The Shapefile format has a couple limitations:
-         * - "the_geom" is always first, and used for the geometry attribute name
-         * - "the_geom" must be of type Point, MultiPoint, MuiltiLineString, MultiPolygon
-         * - Attribute names are limited in length
-         * - Not all data types are supported (example Timestamp represented as Date)
-         *
-         * Each data store has different limitations so check the resulting SimpleFeatureType.
-         */
-        println("SHAPE:$SHAPE_TYPE");
-
-        if (featureSource is SimpleFeatureStore) {
-            val featureStore: SimpleFeatureStore = featureSource
-            /*
-             * SimpleFeatureStore has a method to add features from a
-             * SimpleFeatureCollection object, so we use the ListFeatureCollection
-             * class to wrap our list of features.
-             */
-            val collection: SimpleFeatureCollection = ListFeatureCollection(TYPE, features);
-            featureStore.transaction = transaction;
-            try {
-                featureStore.addFeatures(collection);
-                transaction.commit();
-            } catch ( problem: Exception) {
-                problem.printStackTrace();
-                transaction.rollback();
-            } finally {
-                transaction.close();
-            }
-            exitProcess(0); // success!
-        } else {
-            println("$typeName does not support read/write access");
-            exitProcess(1);
-        }
-    }
-
-    fun createPointShapeFile(nodes: List<MyNode>) {
+    /**
+     * Centrality 분석 결과를 Shape 파일로 저장
+     */
+    fun createPointShapeFile(database: Neo4jUtil.Database, centrality: Neo4jUtil.Centrality, nodes: List<MyNode>) {
         val geometryFactory = JTSFactoryFinder.getGeometryFactory()
 
 //        val featureType = SimpleFeatureTypeBuilder().apply {
@@ -339,9 +239,10 @@ object GeoToolsUtil {
             featureBuilder.buildFeature(null)
         })
 
+        val now = LocalDateTime.now()
         val dataStore = ShapefileDataStoreFactory()
             .createNewDataStore(mapOf(
-                "url" to Paths.get("./output/centrality_result_${System.currentTimeMillis()}.shp").toUri().toURL(),
+                "url" to Paths.get("./data/output/${database.value}_${centrality.value}_centrality_${now}.shp").toUri().toURL(),
                 "create spatial index" to true,
                 "charset" to Charset.forName("UTF-8")
             )) as ShapefileDataStore
@@ -390,7 +291,7 @@ object GeoToolsUtil {
 
         val dataStore = ShapefileDataStoreFactory()
             .createNewDataStore(mapOf(
-                "url" to Paths.get("./output/test_line.shp").toUri().toURL(),
+                "url" to Paths.get("./data/output/test_line.shp").toUri().toURL(),
                 "create spatial index" to true,
                 "charset" to Charset.forName("UTF-8")
             )) as ShapefileDataStore

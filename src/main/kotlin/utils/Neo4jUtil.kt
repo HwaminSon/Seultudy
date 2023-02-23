@@ -12,16 +12,21 @@ import java.util.logging.Logger
 class Neo4jUtil() : AutoCloseable {
     private val driver: Driver
 
-    enum class Centrality {
-        betweenness,
-        eigenvector,
+    enum class Centrality(val value: String) {
+        BETWEENNESS("betweenness"),
+        EIGENVECTOR("eigenvector"),
+    }
+
+    enum class Database(val value: String) {
+        DEFAULT("neo4j"),
+        ROAD_NETWORK("road-network"),
     }
 
     private val mySession
         get() = driver.session(SessionConfig.forDatabase("neo4j"))
 
-    private fun createSession(database: String = "neo4j"): Session {
-        return driver.session(SessionConfig.forDatabase(database))
+    private fun createSession(database: Database = Database.DEFAULT): Session {
+        return driver.session(SessionConfig.forDatabase(database.value))
     }
 
     init {
@@ -119,19 +124,35 @@ class Neo4jUtil() : AutoCloseable {
         }
     }
 
-    fun runCentrality(centrality: Centrality): List<MyNode> {
-        // check if graph exists
-        val graphName = "graph_nd"
-        val qRemoveGraphIfExists = "Call gds.graph.drop('$graphName', false);"
-        val qCreateGraph = """
+    private val graphName = "graph_nd"
+
+    private fun getNodeProjection(database: Database): String {
+        return when(database) {
+            Database.DEFAULT -> "['Apartment', 'PublicTransport', 'EducationalFacility', 'ConvenienceFacility']"
+            Database.ROAD_NETWORK -> "'Point'"
+        }
+    }
+
+    private fun getRelationshipProjection(database: Database): String {
+        return when(database) {
+            Database.DEFAULT -> "{NETWORK_DISTANCE: { orientation: 'UNDIRECTED', properties: 'weight' }}"
+            Database.ROAD_NETWORK -> "{CONNECT: { orientation: 'UNDIRECTED', properties: 'weight' }}"
+        }
+    }
+
+    private fun getCreateGraphCypher(database: Database, centrality: Centrality): String {
+        return """
             Call gds.graph.project(
                 '$graphName',
-                 ['Apartment', 'PublicTransport', 'EducationalFacility', 'ConvenienceFacility'],
-                 {NETWORK_DISTANCE: { orientation: 'UNDIRECTED', properties: 'weight' }}
+                 ${getNodeProjection(database)},
+                 ${getRelationshipProjection(database)}
              );
         """.trimIndent()
-        val qCalculation = """
-            CALL gds.${centrality.name}.stream('${graphName}', {
+    }
+
+    private fun getCalculationCypher(centrality: Centrality): String {
+        return """
+            CALL gds.${centrality.value}.stream('${graphName}', {
               maxIterations: 20,
               relationshipWeightProperty: 'weight'
             })
@@ -141,9 +162,20 @@ class Neo4jUtil() : AutoCloseable {
                 score
             ORDER BY score DESC
         """.trimIndent()
+    }
 
-        return try {
-            mySession.use {
+    /**
+     * 아파트 - 주변 시설 간의 Centrality 를 계산한다.
+     */
+    fun runCentrality(database: Database, centrality: Centrality): List<MyNode> {
+        // check if graph exists
+        val graphName = "graph_nd"
+        val qRemoveGraphIfExists = "Call gds.graph.drop('$graphName', false);"
+        val qCreateGraph = getCreateGraphCypher(database, centrality)
+        val qCalculation = getCalculationCypher(centrality)
+
+        try {
+            val result = createSession(database).use {
                 it.run(qRemoveGraphIfExists)
                 it.run(qCreateGraph)
                 val result = it.run(qCalculation)
@@ -172,6 +204,10 @@ class Neo4jUtil() : AutoCloseable {
 
                 myNodeList
             }
+
+            GeoToolsUtil.createPointShapeFile(database, centrality, result)
+
+            return result
         } catch (e: Neo4jException) {
             e.printStackTrace()
             throw e
@@ -183,7 +219,7 @@ class Neo4jUtil() : AutoCloseable {
         val start = System.currentTimeMillis()
 
         try {
-            createSession("road-network").use { session ->
+            createSession(Database.ROAD_NETWORK).use { session ->
                 session.executeWriteWithoutResult { tr ->
                     // 이전의 데이터는 삭제
                     tr.run("MATCH (n) DETACH DELETE n").consume()
@@ -195,9 +231,9 @@ class Neo4jUtil() : AutoCloseable {
                         val point2 = coordinates.last()
 
                         val createLine = """
-                                MERGE (a: Point {coordinate: POINT({latitude:toFloat(${"$"}lat1), longitude:toFloat(${"$"}lng1)})})
-                                MERGE (b: Point {coordinate: POINT({latitude:toFloat(${"$"}lat2), longitude:toFloat(${"$"}lng2)})})
-                                MERGE (a)-[r:CONNECT {length: ${"$"}length}]-(b)
+                                MERGE (a: Point {coord: POINT({latitude:toFloat(${"$"}lat1), longitude:toFloat(${"$"}lng1)})})
+                                MERGE (b: Point {coord: POINT({latitude:toFloat(${"$"}lat2), longitude:toFloat(${"$"}lng2)})})
+                                MERGE (a)-[r:CONNECT {length: ${"$"}length, weight: ${"$"}weight}]-(b)
                             """.trimIndent()
 
                         val result = tr.run(
@@ -208,6 +244,7 @@ class Neo4jUtil() : AutoCloseable {
                                 "lat2" to point2.y,
                                 "lng2" to point2.x,
                                 "length" to length,
+                                "weight" to 1/length,
                             ))
 
                         result.consume()

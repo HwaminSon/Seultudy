@@ -12,7 +12,7 @@ object CsvUtil {
         try {
             val fileName = fileName ?: "result_${System.currentTimeMillis()}"
             println("fileName = $fileName")
-            val file = File("./output/$fileName.csv")
+            val file = File("./data/output/$fileName.csv")
 
             CSVFormat.DEFAULT.print(file, Charset.defaultCharset()).apply {
                 printRecord(
@@ -44,7 +44,7 @@ object CsvUtil {
         try {
             val fileName = fileName ?: "relationships_${System.currentTimeMillis()}"
             println("fileName = $fileName")
-            val file = File("./output/$fileName.csv")
+            val file = File("./data/output/$fileName.csv")
 
             CSVFormat.DEFAULT.print(file, Charset.defaultCharset()).apply {
                 printRecord(
